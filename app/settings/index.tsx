@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ListRow, Section } from '@/components/common/ListRow';
 import { Segmented } from '@/components/common/Segmented';
@@ -116,12 +116,14 @@ export default function Settings() {
 
       <Section title="Bildirimler">
         <View style={styles.padded}>
-          <SwitchRow
-            label="Anlık bildirimler"
-            description="Telefonuna bildirim gönderilir. Kapalıyken bildirimlerini uygulama içinde görmeye devam edersin."
-            value={pushEnabled}
-            onChange={togglePush}
-          />
+          {Platform.OS !== 'web' ? (
+            <SwitchRow
+              label="Anlık bildirimler"
+              description="Telefonuna bildirim gönderilir. Kapalıyken bildirimlerini uygulama içinde görmeye devam edersin."
+              value={pushEnabled}
+              onChange={togglePush}
+            />
+          ) : null}
           {notif ? (
             <>
               <SwitchRow label="Beğeniler" value={notif.likes} onChange={(v) => toggleNotif('likes', v)} />

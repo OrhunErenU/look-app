@@ -20,7 +20,7 @@ function json(body: unknown, status = 200) {
 }
 
 async function removeFolder(admin: ReturnType<typeof createClient>, bucket: string, prefix: string) {
-  // Kullanıcı klasörü iki seviyelidir: {user_id}/{post_id}/{dosya}.
+  // Kullanıcı klasörleri {user_id}/ ile başlar; alt klasörler de taranır.
   const queue = [prefix];
   while (queue.length > 0) {
     const folder = queue.shift()!;
@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   try {
     await removeFolder(admin, 'post-images', userId);
+    await removeFolder(admin, 'wardrobe', userId);
     await removeFolder(admin, 'avatars', userId);
     const { error } = await admin.auth.admin.deleteUser(userId);
     if (error) throw error;

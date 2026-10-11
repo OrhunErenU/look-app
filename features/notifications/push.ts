@@ -6,8 +6,11 @@ import { Platform } from 'react-native';
 
 import { supabase } from '@/services/supabase';
 
+// Push bildirimleri yalnızca iOS ve Android uygulamasında desteklenir.
+const supported = Platform.OS === 'ios' || Platform.OS === 'android';
+
 // Uygulama açıkken gelen bildirim sessizce listeye düşer; ekranı kaplamaz.
-Notifications.setNotificationHandler({
+if (supported) Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -19,6 +22,7 @@ Notifications.setNotificationHandler({
 let registeredToken: string | null = null;
 
 export async function pushPermissionGranted(): Promise<boolean> {
+  if (!supported) return false;
   const status = await Notifications.getPermissionsAsync();
   return status.granted;
 }
@@ -26,7 +30,7 @@ export async function pushPermissionGranted(): Promise<boolean> {
 // Kullanıcı ayarlardan açtığında izin istenir. İzin verilmezse uygulama
 // normal şekilde çalışmaya devam eder; bildirimler uygulama içinde görünür.
 export async function enablePush(): Promise<'enabled' | 'denied' | 'unsupported'> {
-  if (!Device.isDevice) return 'unsupported';
+  if (!supported || !Device.isDevice) return 'unsupported';
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -70,6 +74,7 @@ export async function disablePush() {
 // Bildirime dokunulduğunda ilgili ekran açılır. Sunucu yalnızca uygulama
 // içi yolları gönderir (ör. /post/<id>).
 export function listenForNotificationTaps() {
+  if (!supported) return () => {};
   const open = (response: Notifications.NotificationResponse | null) => {
     const path = response?.notification.request.content.data?.path;
     if (typeof path === 'string' && path.startsWith('/')) router.push(path as never);

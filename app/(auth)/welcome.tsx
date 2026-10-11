@@ -11,6 +11,10 @@ import { spacing } from '@/constants/theme';
 import { signInWithProvider } from '@/features/auth/api';
 import { friendlyError } from '@/utils/errors';
 
+// Google ve Apple girişi, sağlayıcılar Supabase'de yapılandırıldıktan sonra
+// EXPO_PUBLIC_AUTH_PROVIDERS=google,apple ile açılır.
+const PROVIDERS = (process.env.EXPO_PUBLIC_AUTH_PROVIDERS ?? '').split(',').map((p: string) => p.trim());
+
 export default function Welcome() {
   const [busy, setBusy] = useState<'google' | 'apple' | null>(null);
 
@@ -39,15 +43,17 @@ export default function Welcome() {
 
       <View style={styles.actions}>
         <Button title="E-posta ile devam et" icon="mail-outline" onPress={() => router.push('/sign-in')} />
-        <Button
-          title="Google ile giriş"
-          icon="logo-google"
-          variant="secondary"
-          loading={busy === 'google'}
-          disabled={busy !== null}
-          onPress={() => oauth('google')}
-        />
-        {Platform.OS === 'ios' ? (
+        {PROVIDERS.includes('google') ? (
+          <Button
+            title="Google ile giriş"
+            icon="logo-google"
+            variant="secondary"
+            loading={busy === 'google'}
+            disabled={busy !== null}
+            onPress={() => oauth('google')}
+          />
+        ) : null}
+        {Platform.OS === 'ios' && PROVIDERS.includes('apple') ? (
           <Button
             title="Apple ile giriş"
             icon="logo-apple"

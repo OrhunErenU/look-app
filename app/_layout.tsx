@@ -14,9 +14,11 @@ import { AuthProvider, useAuth } from '@/features/auth/AuthProvider';
 import { listenForNotificationTaps, refreshPushRegistration } from '@/features/notifications/push';
 import { PreferencesProvider } from '@/features/preferences/PreferencesProvider';
 import { useTheme } from '@/hooks/useTheme';
+import { installWebAlert } from '@/services/alert';
 import { isSupabaseConfigured } from '@/services/supabase';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+installWebAlert();
 
 export default function RootLayout() {
   return (

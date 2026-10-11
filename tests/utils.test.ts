@@ -13,6 +13,10 @@ describe('görsel hesapları', () => {
     expect(centerCrop(1080, 1920, '4:5')).toEqual({ originX: 0, originY: 285, width: 1080, height: 1350 });
   });
 
+  it('dikey fotoğrafı 3:4 için ortadan keser', () => {
+    expect(centerCrop(1080, 1920, '3:4')).toEqual({ originX: 0, originY: 240, width: 1080, height: 1440 });
+  });
+
   it('yatay fotoğrafı 1:1 için ortadan keser', () => {
     expect(centerCrop(2000, 1000, '1:1')).toEqual({ originX: 500, originY: 0, width: 1000, height: 1000 });
   });
@@ -27,7 +31,7 @@ describe('görsel hesapları', () => {
   });
 
   it('akıştaki görüntü oranını sınırlar', () => {
-    expect(displayAspect(1080, 3000)).toBeCloseTo(0.8);
+    expect(displayAspect(1080, 3000)).toBeCloseTo(0.75);
     expect(displayAspect(4000, 1000)).toBeCloseTo(1.91);
     expect(displayAspect(1000, 1000)).toBe(1);
   });

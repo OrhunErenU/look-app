@@ -1,6 +1,7 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
+import { disablePush } from '@/features/notifications/push';
 import { supabase } from '@/services/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -12,16 +13,16 @@ export async function signInWithEmail(email: string, password: string) {
   if (error) throw error;
 }
 
-// Doğum tarihi kayıt sırasında alınır ve profil oluşturma adımında sunucuda
-// yeniden doğrulanır. E-posta doğrulaması açık olduğunda oturum, kullanıcı
-// bağlantıya tıklayana kadar açılmaz.
-export async function signUpWithEmail(email: string, password: string, birthDate: string) {
+// E-posta doğrulaması açık olduğunda oturum, kullanıcı bağlantıya tıklayana
+// kadar açılmaz. Yaş kontrolü profil oluşturma adımında yapılır; doğum tarihi
+// hiçbir yerde saklanmaz.
+export async function signUpWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
     options: {
       emailRedirectTo: callbackUrl(),
-      data: { birth_date: birthDate, terms_accepted_at: new Date().toISOString() },
+      data: { terms_accepted_at: new Date().toISOString() },
     },
   });
   if (error) throw error;
@@ -87,5 +88,7 @@ export async function signInWithProvider(provider: 'google' | 'apple'): Promise<
 }
 
 export async function signOut() {
+  // Bu cihaz çıkış yapan hesabın bildirimlerini almaya devam etmesin.
+  await disablePush().catch(() => {});
   await supabase.auth.signOut();
 }

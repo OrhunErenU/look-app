@@ -1,30 +1,35 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActionSheetIOS,
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useActionSheet, type SheetAction } from '@/components/common/ActionSheet';
+import { Button } from '@/components/common/Button';
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/States';
 import { Text } from '@/components/common/Text';
 import { CommentItem } from '@/components/post/CommentItem';
 import { PostCard } from '@/components/post/PostCard';
+import { ItemStrip } from '@/components/wardrobe/ItemStrip';
 import { radius, spacing, typography } from '@/constants/theme';
 import { useMe } from '@/features/auth/AuthProvider';
-import { fetchPost } from '@/features/posts/api';
+import { fetchPost, fetchPostItems, fetchSimilarPosts } from '@/features/posts/api';
 import { usePostActions } from '@/features/posts/usePostActions';
-import { addComment, deleteComment, editComment, fetchComments } from '@/features/social/api';
+import { addComment, blockUser, deleteComment, editComment, fetchComments } from '@/features/social/api';
 import { useTheme } from '@/hooks/useTheme';
-import type { Comment, FeedPost } from '@/types/database';
+import type { Comment, FeedPost, PostItemDetail } from '@/types/database';
 import { threadComments } from '@/utils/comments';
 import { friendlyError } from '@/utils/errors';
 import { COMMENT_MAX } from '@/utils/validation';
@@ -42,10 +47,13 @@ export default function PostDetail() {
   const me = useMe();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const showSheet = useActionSheet();
   const inputRef = useRef<TextInput>(null);
 
   const [post, setPost] = useState<FeedPost | null | undefined>(undefined);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [items, setItems] = useState<PostItemDetail[]>([]);
+  const [similar, setSimilar] = useState<FeedPost[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
@@ -58,6 +66,11 @@ export default function PostDetail() {
       const [p, c] = await Promise.all([fetchPost(id), fetchComments(id)]);
       setPost(p);
       setComments(c);
+      if (p) {
+        // Parçalar ve benzer kombinler ikincil bilgidir; hata ekranı bozmaz.
+        fetchPostItems(id).then(setItems).catch(() => setItems([]));
+        fetchSimilarPosts(id).then(setSimilar).catch(() => setSimilar([]));
+      }
     } catch (e) {
       setError(friendlyError(e));
     }
@@ -102,7 +115,8 @@ export default function PostDetail() {
   const commentMenu = (comment: Comment) => {
     const mine = comment.user_id === me.id;
     const canDelete = mine || post?.user_id === me.id;
-    const options: { label: string; destructive?: boolean; run: () => void }[] = [];
+    const username = comment.author?.username ?? 'kullanıcı';
+    const options: SheetAction[] = [];
     if (mine) {
       options.push({
         label: 'Düzenle',
@@ -137,34 +151,43 @@ export default function PostDetail() {
         destructive: true,
         run: () => router.push({ pathname: '/report', params: { commentId: comment.id, userId: comment.user_id } }),
       });
+      options.push({
+        label: `@${username} kullanıcısını engelle`,
+        destructive: true,
+        run: () =>
+          Alert.alert(`@${username} engellensin mi?`, 'Birbirinizin içeriklerini ve yorumlarını göremeyeceksiniz.', [
+            { text: 'Vazgeç', style: 'cancel' },
+            {
+              text: 'Engelle',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await blockUser(comment.user_id);
+                  setComments((prev) => prev.filter((c) => c.user_id !== comment.user_id));
+                } catch (e) {
+                  Alert.alert('Engellenemedi', friendlyError(e));
+                }
+              },
+            },
+          ]),
+      });
     }
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [...options.map((o) => o.label), 'Vazgeç'],
-          cancelButtonIndex: options.length,
-          destructiveButtonIndex: options.flatMap((o, i) => (o.destructive ? [i] : [])),
-        },
-        (i) => options[i]?.run(),
-      );
-    } else {
-      Alert.alert('Yorum', undefined, [
-        ...options.map((o) => ({ text: o.label, style: o.destructive ? ('destructive' as const) : ('default' as const), onPress: o.run })),
-        { text: 'Vazgeç', style: 'cancel' as const },
-      ]);
-    }
+    showSheet({ actions: options });
   };
 
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (post === undefined) return <LoadingState />;
   if (post === null) {
     return (
-      <EmptyState
-        icon="eye-off-outline"
-        title="Bu kombin artık mevcut değil"
-        message="Paylaşım silinmiş, gizlenmiş veya görüntüleme iznin yok."
-      />
+      <View style={styles.flex}>
+        <EmptyState
+          icon="eye-off-outline"
+          title="Bu kombin artık mevcut değil"
+          message="Paylaşım silinmiş, gizlenmiş veya görüntüleme iznin yok."
+          actionTitle="Ana sayfaya dön"
+          onAction={() => router.navigate('/')}
+        />
+      </View>
     );
   }
 
@@ -186,8 +209,15 @@ export default function PostDetail() {
               detailed
               onLike={actions.toggleLike}
               onSave={actions.toggleSave}
+              onShare={actions.share}
               onMenu={(p) => actions.openMenu(p, { onDeleted: () => router.back() })}
             />
+            {items.length > 0 ? (
+              <View style={styles.section}>
+                <Text variant="subtitle">Kullanılan parçalar</Text>
+                <ItemStrip items={items} />
+              </View>
+            ) : null}
             {details.length > 0 ? (
               <View style={[styles.details, { borderColor: colors.border }]}>
                 {details.map(([key, value]) => (
@@ -202,6 +232,7 @@ export default function PostDetail() {
                 ))}
               </View>
             ) : null}
+            {similar.length > 0 ? <SimilarPosts posts={similar} /> : null}
             <Text variant="subtitle" style={styles.commentsTitle}>
               Yorumlar
             </Text>
@@ -230,6 +261,7 @@ export default function PostDetail() {
                 : undefined
             }
             onLongPress={() => commentMenu(item.comment)}
+            onMenu={() => commentMenu(item.comment)}
           />
         )}
         contentContainerStyle={{ paddingBottom: spacing.xl }}
@@ -297,10 +329,49 @@ export default function PostDetail() {
   );
 }
 
+function SimilarPosts({ posts }: { posts: FeedPost[] }) {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const cell = Math.min(140, (width - spacing.lg * 2) / 2.6);
+  return (
+    <View style={styles.section}>
+      <Text variant="subtitle">Benzer kombinler</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarRow}>
+        {posts.map((p) => {
+          const cover = p.images[0];
+          return (
+            <Pressable
+              key={p.id}
+              onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.id } })}
+              accessibilityRole="button"
+              accessibilityLabel={p.title || `${p.author.username} kombini`}
+              style={{ width: cell }}
+            >
+              <View style={[styles.similarCover, { height: cell * (4 / 3), backgroundColor: colors.skeleton }]}>
+                <Image
+                  source={{ uri: cover.thumbUrl, cacheKey: cover.thumb_path }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                />
+              </View>
+              <Text variant="small" tone="secondary" numberOfLines={1}>
+                @{p.author.username}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <Button title="Keşfet'te daha fazlası" variant="ghost" compact onPress={() => router.navigate('/explore')} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  section: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
   details: {
     marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingVertical: spacing.sm,
@@ -308,6 +379,8 @@ const styles = StyleSheet.create({
   },
   detailRow: { flexDirection: 'row', gap: spacing.md },
   detailLabel: { width: 76 },
+  similarRow: { gap: spacing.md },
+  similarCover: { borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.xs },
   commentsTitle: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xs },
   composer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.xs },
   contextRow: { flexDirection: 'row', alignItems: 'center' },

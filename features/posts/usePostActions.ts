@@ -1,9 +1,12 @@
 import { router } from 'expo-router';
 import { useCallback } from 'react';
-import { ActionSheetIOS, Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 
+import { useActionSheet, type SheetAction } from '@/components/common/ActionSheet';
 import { useAuth } from '@/features/auth/AuthProvider';
-import { deletePost, hidePost, setLiked, setSaved } from '@/features/posts/api';
+import { deletePost, hidePost, setLiked, setPinned, setSaved } from '@/features/posts/api';
+import { notifyPostsChanged } from '@/features/posts/events';
+import { canShare, sharePost } from '@/features/posts/share';
 import { blockUser } from '@/features/social/api';
 import type { FeedPost } from '@/types/database';
 import { friendlyError } from '@/utils/errors';
@@ -14,6 +17,7 @@ type Update = (id: string, change: Partial<FeedPost> | null) => void;
 // sunucu hata verirse eski hâline döner.
 export function usePostActions(update: Update) {
   const { profile } = useAuth();
+  const showSheet = useActionSheet();
 
   const toggleLike = useCallback(
     async (post: FeedPost) => {
@@ -43,6 +47,10 @@ export function usePostActions(update: Update) {
     [update],
   );
 
+  const share = useCallback((post: FeedPost) => {
+    sharePost(post);
+  }, []);
+
   const openMenu = useCallback(
     (post: FeedPost, options: { allowHide?: boolean; onDeleted?: () => void } = {}) => {
       const mine = post.user_id === profile?.id;
@@ -57,6 +65,7 @@ export function usePostActions(update: Update) {
               try {
                 await deletePost(post);
                 update(post.id, null);
+                notifyPostsChanged();
                 options.onDeleted?.();
               } catch (e) {
                 Alert.alert('Silinemedi', friendlyError(e));
@@ -95,12 +104,30 @@ export function usePostActions(update: Update) {
         }
       };
 
-      const actions: { label: string; destructive?: boolean; run: () => void }[] = mine
+      const togglePin = async () => {
+        const pinned = !post.pinned_at;
+        try {
+          await setPinned(post.id, pinned);
+          update(post.id, { pinned_at: pinned ? new Date().toISOString() : null });
+          notifyPostsChanged();
+        } catch (e) {
+          Alert.alert('İşlem tamamlanamadı', friendlyError(e));
+        }
+      };
+
+      const addToCollection = () => router.push({ pathname: '/collection/add', params: { postId: post.id } });
+
+      const actions: SheetAction[] = mine
         ? [
             { label: 'Düzenle', run: () => router.push({ pathname: '/post/edit/[id]', params: { id: post.id } }) },
+            { label: post.pinned_at ? 'Profilde öne çıkarmayı kaldır' : 'Profilde öne çıkar', run: togglePin },
+            { label: 'Koleksiyona ekle', run: addToCollection },
+            ...(canShare(post) ? [{ label: 'Bağlantıyı paylaş', run: () => share(post) }] : []),
             { label: 'Sil', destructive: true, run: confirmDelete },
           ]
         : [
+            { label: 'Koleksiyona ekle', run: addToCollection },
+            ...(canShare(post) ? [{ label: 'Bağlantıyı paylaş', run: () => share(post) }] : []),
             ...(options.allowHide ? [{ label: 'İlgilenmiyorum', run: hide }] : []),
             {
               label: 'Şikâyet et',
@@ -110,30 +137,12 @@ export function usePostActions(update: Update) {
             { label: `@${post.author.username} kullanıcısını engelle`, destructive: true, run: confirmBlock },
           ];
 
-      if (Platform.OS === 'ios') {
-        ActionSheetIOS.showActionSheetWithOptions(
-          {
-            options: [...actions.map((a) => a.label), 'Vazgeç'],
-            cancelButtonIndex: actions.length,
-            destructiveButtonIndex: actions.flatMap((a, i) => (a.destructive ? [i] : [])),
-          },
-          (index) => actions[index]?.run(),
-        );
-      } else {
-        Alert.alert('Seçenekler', undefined, [
-          ...actions.map((a) => ({
-            text: a.label,
-            style: a.destructive ? ('destructive' as const) : ('default' as const),
-            onPress: a.run,
-          })),
-          { text: 'Vazgeç', style: 'cancel' as const },
-        ]);
-      }
+      showSheet({ actions });
     },
-    [profile?.id, update],
+    [profile?.id, update, share, showSheet],
   );
 
-  return { toggleLike, toggleSave, openMenu };
+  return { toggleLike, toggleSave, openMenu, share };
 }
 
 // FeedPost listesi için güncelleme yardımcı fonksiyonu.

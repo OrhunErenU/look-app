@@ -375,6 +375,12 @@ select test.expect((select id from public.suggested_profiles(1)) = :alice, 'öne
 
 -- Push belirteçleri ve uygulama ayarları ----------------------------------------------
 insert into public.device_tokens (token, user_id, platform) values ('ExponentPushToken[dave]', auth.uid(), 'ios');
+select test.as_user(:carol);
+select public.register_device('ExponentPushToken[dave]', 'ios');
+select test.expect((select count(*) from public.device_tokens) = 1, 'aynı cihazda oturum açan yeni kullanıcı belirteci devralır');
+select test.as_user(:dave);
+select test.expect((select count(*) from public.device_tokens) = 0, 'devredilen belirteç eski kullanıcıda kalmaz');
+select public.register_device('ExponentPushToken[dave]', 'ios');
 select test.as_user(:alice);
 select test.expect((select count(*) from public.device_tokens) = 0, 'başkalarının cihaz belirteçleri görünmez');
 select test.expect((select value ->> 'enabled' from public.app_settings where key = 'maintenance') = 'false',

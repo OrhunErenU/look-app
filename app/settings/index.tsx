@@ -10,6 +10,7 @@ import { LEGAL_URLS, SUPPORT_EMAIL, openUrl } from '@/constants/links';
 import { spacing } from '@/constants/theme';
 import { signOut } from '@/features/auth/api';
 import { useAuth, useMe } from '@/features/auth/AuthProvider';
+import { disablePush, enablePush, pushPermissionGranted } from '@/features/notifications/push';
 import { usePreferences, type ThemePreference } from '@/features/preferences/PreferencesProvider';
 import { updateProfile } from '@/features/profiles/api';
 import { fetchNotificationSettings, updateNotificationSettings } from '@/features/social/api';
@@ -30,6 +31,33 @@ export default function Settings() {
   const { themePreference, setThemePreference } = usePreferences();
   const [isPrivate, setIsPrivate] = useState(me.is_private);
   const [notif, setNotif] = useState<NotificationSettings | null>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  useEffect(() => {
+    pushPermissionGranted().then(setPushEnabled).catch(() => {});
+  }, []);
+
+  const togglePush = async (value: boolean) => {
+    if (!value) {
+      setPushEnabled(false);
+      await disablePush().catch(() => {});
+      return;
+    }
+    try {
+      const result = await enablePush();
+      if (result === 'enabled') setPushEnabled(true);
+      else if (result === 'denied') {
+        Alert.alert('Bildirim izni kapalı', 'Telefonunun ayarlarından LOOK için bildirimlere izin verebilirsin.', [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Ayarları aç', onPress: () => Linking.openSettings() },
+        ]);
+      } else {
+        Alert.alert('Kullanılamıyor', 'Anlık bildirimler bu cihazda veya bu sürümde kullanılamıyor.');
+      }
+    } catch (e) {
+      Alert.alert('Bildirimler açılamadı', friendlyError(e));
+    }
+  };
 
   useEffect(() => {
     fetchNotificationSettings(me.id).then(setNotif).catch(() => {});
@@ -88,6 +116,12 @@ export default function Settings() {
 
       <Section title="Bildirimler">
         <View style={styles.padded}>
+          <SwitchRow
+            label="Anlık bildirimler"
+            description="Telefonuna bildirim gönderilir. Kapalıyken bildirimlerini uygulama içinde görmeye devam edersin."
+            value={pushEnabled}
+            onChange={togglePush}
+          />
           {notif ? (
             <>
               <SwitchRow label="Beğeniler" value={notif.likes} onChange={(v) => toggleNotif('likes', v)} />
@@ -98,7 +132,6 @@ export default function Settings() {
                 value={notif.new_posts}
                 onChange={(v) => toggleNotif('new_posts', v)}
               />
-              <SwitchRow label="E-posta bildirimleri" value={notif.email} onChange={(v) => toggleNotif('email', v)} />
             </>
           ) : null}
         </View>

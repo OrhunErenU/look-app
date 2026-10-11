@@ -12,13 +12,14 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
+import { palette } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import type { FeedPost } from '@/types/database';
 
 const COLUMNS = 3;
 const GAP = 2;
 
-// Profil, keşfet ve kaydedilenler için kapak görseli ızgarası. Hücreler 4:5
+// Profil, keşfet ve kaydedilenler için kapak görseli ızgarası. Hücreler 3:4
 // oranında tutarlı biçimde kırpılır.
 export function PostGrid({
   posts,
@@ -66,9 +67,9 @@ export function PostGrid({
         return (
           <Pressable
             onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } })}
-            style={{ width: size, height: size * 1.25, backgroundColor: colors.skeleton }}
+            style={{ width: size, height: size * (4 / 3), backgroundColor: colors.skeleton }}
             accessibilityRole="button"
-            accessibilityLabel={`${item.author.username} kombini${item.caption ? `: ${item.caption}` : ''}`}
+            accessibilityLabel={item.title ? `${item.title}, ${item.author.username}` : `${item.author.username} kombini`}
           >
             <Image
               source={{ uri: cover.thumbUrl, cacheKey: cover.thumb_path }}
@@ -78,7 +79,10 @@ export function PostGrid({
               recyclingKey={item.id}
             />
             {item.images.length > 1 ? (
-              <Ionicons name="copy-outline" size={16} color="#FFFFFF" style={styles.multi} />
+              <Ionicons name="copy-outline" size={16} color={palette.dark.text} style={styles.multi} />
+            ) : null}
+            {item.pinned_at ? (
+              <Ionicons name="pin" size={14} color={palette.dark.text} style={styles.pin} />
             ) : null}
           </Pressable>
         );
@@ -89,5 +93,6 @@ export function PostGrid({
 
 const styles = StyleSheet.create({
   multi: { position: 'absolute', top: 6, right: 6, opacity: 0.9 },
+  pin: { position: 'absolute', top: 6, left: 6, opacity: 0.9 },
   footer: { paddingVertical: 24 },
 });

@@ -6,7 +6,7 @@ import { Screen } from '@/components/common/Screen';
 import { Text } from '@/components/common/Text';
 import { TextField } from '@/components/common/TextField';
 import { spacing } from '@/constants/theme';
-import { signOut, updateEmail, updatePassword } from '@/features/auth/api';
+import { signInWithEmail, signOut, updateEmail, updatePassword } from '@/features/auth/api';
 import { useAuth, useMe } from '@/features/auth/AuthProvider';
 import { deleteAccount } from '@/features/social/api';
 import { useTheme } from '@/hooks/useTheme';
@@ -22,6 +22,9 @@ export default function Account() {
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
   const [busy, setBusy] = useState<'email' | 'password' | 'delete' | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  // E-posta ile kayıtlı hesaplarda silmeden önce parola yeniden doğrulanır.
+  const usesPassword = (session?.user.identities ?? []).some((i) => i.provider === 'email');
 
   const saveEmail = async () => {
     const error = validateEmail(email);
@@ -64,6 +67,15 @@ export default function Account() {
           onPress: async () => {
             setBusy('delete');
             try {
+              if (usesPassword) {
+                try {
+                  await signInWithEmail(session?.user.email ?? '', deletePassword);
+                } catch {
+                  setMessage({ tone: 'danger', text: 'Parola hatalı. Hesabın silinmedi.' });
+                  setBusy(null);
+                  return;
+                }
+              }
               await deleteAccount();
               await signOut();
             } catch (e) {
@@ -103,12 +115,24 @@ export default function Account() {
           işlem geçmişi) kişisel bilgilerinden ayrılarak saklanabilir. Onaylamak için kullanıcı adını yaz: @{me.username}
         </Text>
         <TextField value={confirmText} onChangeText={setConfirmText} autoCapitalize="none" placeholder={me.username} />
+        {usesPassword ? (
+          <TextField
+            value={deletePassword}
+            onChangeText={setDeletePassword}
+            secureTextEntry
+            placeholder="Parolan"
+            autoComplete="current-password"
+            accessibilityLabel="Hesabı silmek için parolan"
+          />
+        ) : null}
         <Button
           title="Hesabımı kalıcı olarak sil"
           variant="danger"
           onPress={remove}
           loading={busy === 'delete'}
-          disabled={confirmText.trim().replace(/^@/, '').toLowerCase() !== me.username}
+          disabled={
+            confirmText.trim().replace(/^@/, '').toLowerCase() !== me.username || (usesPassword && !deletePassword)
+          }
         />
       </View>
     </Screen>

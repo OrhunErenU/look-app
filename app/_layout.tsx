@@ -5,10 +5,13 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ActionSheetProvider } from '@/components/common/ActionSheet';
 import { Screen } from '@/components/common/Screen';
 import { ErrorState } from '@/components/common/States';
 import { Text } from '@/components/common/Text';
+import { AppConfigProvider, useAppConfig } from '@/features/app-config/AppConfigProvider';
 import { AuthProvider, useAuth } from '@/features/auth/AuthProvider';
+import { listenForNotificationTaps, refreshPushRegistration } from '@/features/notifications/push';
 import { PreferencesProvider } from '@/features/preferences/PreferencesProvider';
 import { useTheme } from '@/hooks/useTheme';
 import { isSupabaseConfigured } from '@/services/supabase';
@@ -19,9 +22,13 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <PreferencesProvider>
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
+        <AppConfigProvider>
+          <AuthProvider>
+            <ActionSheetProvider>
+              <RootNavigator />
+            </ActionSheetProvider>
+          </AuthProvider>
+        </AppConfigProvider>
       </PreferencesProvider>
     </SafeAreaProvider>
   );
@@ -30,6 +37,14 @@ export default function RootLayout() {
 function RootNavigator() {
   const { initializing, session, profile, profileError, refreshProfile } = useAuth();
   const { colors, scheme } = useTheme();
+  const { maintenance } = useAppConfig();
+  const ready = Boolean(session) && Boolean(profile);
+
+  useEffect(() => {
+    if (!ready) return;
+    refreshPushRegistration();
+    return listenForNotificationTaps();
+  }, [ready]);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
@@ -49,8 +64,18 @@ function RootNavigator() {
     );
   }
 
+  if (maintenance.enabled) {
+    return (
+      <Screen>
+        <Text variant="title">Kısa bir bakım arası</Text>
+        <Text tone="secondary">
+          {maintenance.message || 'LOOK şu anda bakımda. Kısa süre sonra tekrar deneyebilirsin.'}
+        </Text>
+      </Screen>
+    );
+  }
+
   const signedIn = Boolean(session);
-  const ready = signedIn && Boolean(profile);
 
   return (
     <>
@@ -80,6 +105,11 @@ function RootNavigator() {
           <Stack.Screen name="settings/edit-profile" options={{ title: 'Profili düzenle' }} />
           <Stack.Screen name="settings/account" options={{ title: 'Hesap' }} />
           <Stack.Screen name="settings/blocked" options={{ title: 'Engellenen hesaplar' }} />
+          <Stack.Screen name="wardrobe/item/[id]" options={{ title: '', presentation: 'modal' }} />
+          <Stack.Screen name="wardrobe/pick" options={{ title: 'Parça seç', presentation: 'modal' }} />
+          <Stack.Screen name="collection/[id]" options={{ title: '' }} />
+          <Stack.Screen name="collection/edit" options={{ title: '', presentation: 'modal' }} />
+          <Stack.Screen name="collection/add" options={{ title: 'Koleksiyona ekle', presentation: 'modal' }} />
         </Stack.Protected>
 
         <Stack.Protected guard={signedIn && !profile}>

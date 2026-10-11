@@ -42,13 +42,18 @@ export type Profile = {
 
 export type ProfileSummary = Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path'>;
 
+export type TagKind = 'style' | 'season' | 'occasion';
+
 export type Style = {
   id: number;
   slug: string;
   name: string;
+  kind: TagKind;
   is_active: boolean;
   sort_order: number;
 };
+
+export type TagSummary = Pick<Style, 'slug' | 'name' | 'kind'>;
 
 export type OutfitDetails = Partial<
   Record<'top' | 'bottom' | 'shoes' | 'outerwear' | 'accessory', string>
@@ -57,6 +62,7 @@ export type OutfitDetails = Partial<
 export type Post = {
   id: string;
   user_id: string;
+  title: string;
   caption: string;
   visibility: PostVisibility;
   comments_enabled: boolean;
@@ -65,6 +71,9 @@ export type Post = {
   like_count: number;
   comment_count: number;
   save_count: number;
+  pinned_at: string | null;
+  featured_at: string | null;
+  is_sample: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -85,7 +94,7 @@ export type ResolvedImage = PostImage & { url: string; thumbUrl: string };
 export type FeedPost = Post & {
   author: ProfileSummary;
   images: ResolvedImage[];
-  styles: Pick<Style, 'slug' | 'name'>[];
+  styles: TagSummary[];
   liked_by_me: boolean;
   saved_by_me: boolean;
   // Yalnızca Kaydedilenler listesinde dolu gelir; sayfalama için kullanılır.
@@ -124,4 +133,58 @@ export type NotificationSettings = {
   follows: boolean;
   new_posts: boolean;
   email: boolean;
+};
+
+export type WardrobeCategory = 'top' | 'bottom' | 'outerwear' | 'shoes' | 'bag' | 'accessory' | 'one_piece';
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
+
+export type WardrobeItem = {
+  id: string;
+  user_id: string;
+  name: string;
+  category: WardrobeCategory;
+  color: string | null;
+  style_id: number | null;
+  seasons: Season[];
+  brand: string | null;
+  purchase_price: number | null;
+  purchase_date: string | null;
+  notes: string | null;
+  photo_path: string | null;
+  thumb_path: string | null;
+  status: 'active' | 'archived';
+  wear_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+// Gardırop parçası ve fotoğraf bağlantıları.
+export type ResolvedItem = WardrobeItem & { photoUrl: string | null; thumbUrl: string | null };
+
+// Başkasının kombinindeki parçaların herkese açık özeti.
+export type PostItemDetail = {
+  id: string;
+  name: string;
+  category: WardrobeCategory;
+  color: string | null;
+  brand: string | null;
+  photo_path: string | null;
+  thumb_path: string | null;
+  thumbUrl: string | null;
+};
+
+export type CollectionVisibility = 'private' | 'followers' | 'public';
+
+export type Collection = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  visibility: CollectionVisibility;
+  post_count: number;
+  created_at: string;
+  updated_at: string;
+  // Listelerde kapak olarak gösterilen son eklenen kombinin küçük görseli.
+  coverUrl?: string | null;
+  coverKey?: string | null;
 };

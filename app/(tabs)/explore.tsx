@@ -1,91 +1,112 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip } from '@/components/common/Chip';
-import { IconButton } from '@/components/common/IconButton';
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/States';
 import { Text } from '@/components/common/Text';
-import { TopBar } from '@/components/common/TopBar';
 import { PostGrid } from '@/components/post/PostGrid';
 import { SuggestedUsers } from '@/components/profile/SuggestedUsers';
-import { spacing } from '@/constants/theme';
-import { fetchExplore, type ExploreFilter } from '@/features/posts/api';
+import { HIT_SIZE, radius, spacing } from '@/constants/theme';
+import { fetchExplore, fetchFeatured, type ExploreFilter, type ExploreMode } from '@/features/posts/api';
 import { useStyles } from '@/features/posts/useStyles';
 import { usePagedList } from '@/hooks/usePagedList';
 import { useTheme } from '@/hooks/useTheme';
 import type { FeedPost } from '@/types/database';
 
-// Keşfet: popüler ve yeni kombinler, stil filtreleri ve kullanıcı önerileri.
+const MODES: { value: ExploreMode; label: string }[] = [
+  { value: 'for_you', label: 'Senin için' },
+  { value: 'popular', label: 'Popüler' },
+  { value: 'new', label: 'En yeni' },
+  { value: 'network', label: 'Ağından' },
+];
+
+// Keşfet: kişisel sıralama, popüler/yeni kombinler, arkadaşlarının takip
+// ettikleri, etiket filtreleri, öne çıkanlar ve kişi önerileri.
 export default function Explore() {
   const { colors } = useTheme();
-  const { styles: styleOptions } = useStyles();
-  const [filter, setFilter] = useState<ExploreFilter>({ style: null, mode: 'popular', onlyUnfollowed: false });
+  const { styles: tags } = useStyles();
+  const [filter, setFilter] = useState<ExploreFilter>({ style: null, mode: 'for_you', onlyUnfollowed: false });
+  const [featured, setFeatured] = useState<FeedPost[]>([]);
 
   const list = usePagedList<FeedPost>(
     (previous) => fetchExplore(filter, previous.length),
     [filter.style, filter.mode, filter.onlyUnfollowed],
   );
 
-  const filters = (
+  useEffect(() => {
+    fetchFeatured().then(setFeatured).catch(() => {});
+  }, []);
+
+  const browsing = !filter.style && !filter.onlyUnfollowed && filter.mode === 'for_you';
+
+  const header = (
     <View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filters}
+      <Pressable
+        onPress={() => router.push('/search')}
+        style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        accessibilityRole="search"
+        accessibilityLabel="Kullanıcı, kombin veya stil ara"
       >
-        <Chip
-          label="Popüler"
-          selected={filter.mode === 'popular'}
-          onPress={() => setFilter((f) => ({ ...f, mode: 'popular' }))}
-        />
-        <Chip
-          label="Yeni"
-          selected={filter.mode === 'new'}
-          onPress={() => setFilter((f) => ({ ...f, mode: 'new' }))}
-        />
+        <Ionicons name="search" size={18} color={colors.textSecondary} />
+        <Text tone="secondary">Kullanıcı, kombin veya stil ara</Text>
+      </Pressable>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+        {MODES.map((m) => (
+          <Chip
+            key={m.value}
+            label={m.label}
+            selected={filter.mode === m.value}
+            onPress={() => setFilter((f) => ({ ...f, mode: m.value }))}
+          />
+        ))}
         <Chip
           label="Takip etmediklerim"
           selected={filter.onlyUnfollowed}
           onPress={() => setFilter((f) => ({ ...f, onlyUnfollowed: !f.onlyUnfollowed }))}
         />
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        {styleOptions
-          .filter((s) => s.slug !== 'exploring')
-          .map((s) => (
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagRow}>
+        {tags
+          .filter((t) => t.slug !== 'exploring')
+          .map((t) => (
             <Chip
-              key={s.slug}
-              label={s.name}
-              selected={filter.style === s.slug}
-              onPress={() => setFilter((f) => ({ ...f, style: f.style === s.slug ? null : s.slug }))}
+              key={t.slug}
+              label={t.name}
+              selected={filter.style === t.slug}
+              onPress={() => setFilter((f) => ({ ...f, style: f.style === t.slug ? null : t.slug }))}
             />
           ))}
       </ScrollView>
-      {!filter.style && !filter.onlyUnfollowed ? <SuggestedUsers /> : null}
+
+      {browsing && featured.length > 0 ? <Featured posts={featured} /> : null}
+      {browsing ? <SuggestedUsers /> : null}
     </View>
   );
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopBar
-        left={<Text variant="title">Keşfet</Text>}
-        right={<IconButton name="search-outline" label="Ara" onPress={() => router.push('/search')} />}
-      />
+      <View style={styles.titleRow}>
+        <Text variant="title">Keşfet</Text>
+      </View>
       {list.loading ? (
         <>
-          {filters}
+          {header}
           <LoadingState />
         </>
       ) : list.error && list.items.length === 0 ? (
         <>
-          {filters}
+          {header}
           <ErrorState message={list.error} onRetry={list.retry} />
         </>
       ) : (
         <PostGrid
           posts={list.items}
-          header={filters}
+          header={header}
           refreshing={list.refreshing}
           onRefresh={list.refresh}
           onEndReached={list.loadMore}
@@ -93,12 +114,16 @@ export default function Explore() {
           empty={
             <EmptyState
               icon="sparkles-outline"
-              title="Henüz kombin yok"
+              title="Burada henüz kombin yok"
               message={
-                filter.style
-                  ? 'Bu stilde henüz paylaşım yapılmamış. İlk paylaşan sen ol.'
-                  : 'İlk kombinler paylaşıldıkça burada görünecek.'
+                filter.mode === 'network'
+                  ? 'Takip ettiğin kişilerin takip ettiği hesaplardan yeni paylaşım yok.'
+                  : filter.style
+                    ? 'Bu etiketle henüz paylaşım yapılmamış. İlk paylaşan sen ol.'
+                    : 'Topluluk büyüdükçe kombinler burada görünecek.'
               }
+              actionTitle="Kombin paylaş"
+              onAction={() => router.navigate('/create')}
             />
           }
         />
@@ -107,7 +132,63 @@ export default function Explore() {
   );
 }
 
+// Yönetim panelinden seçilen kombinler. Örnek içerikler ayrıca etiketlenir.
+function Featured({ posts }: { posts: FeedPost[] }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.section}>
+      <Text variant="subtitle" style={styles.sectionTitle}>
+        Öne çıkanlar
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
+        {posts.map((p) => (
+          <Pressable
+            key={p.id}
+            onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.id } })}
+            accessibilityRole="button"
+            accessibilityLabel={`${p.title || 'Öne çıkan kombin'}${p.is_sample ? ', örnek içerik' : ''}`}
+          >
+            <View style={[styles.featuredCover, { backgroundColor: colors.skeleton }]}>
+              <Image
+                source={{ uri: p.images[0].thumbUrl, cacheKey: p.images[0].thumb_path }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+              />
+              {p.is_sample ? (
+                <View style={[styles.sample, { backgroundColor: colors.stone }]}>
+                  <Text variant="small">Örnek</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text variant="caption" numberOfLines={1} style={styles.featuredTitle}>
+              {p.title || `@${p.author.username}`}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  filters: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm, alignItems: 'center' },
-  divider: { width: StyleSheet.hairlineWidth, height: 20, marginHorizontal: spacing.xs },
+  titleRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    minHeight: HIT_SIZE,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  filters: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
+  tagRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
+  section: { paddingBottom: spacing.md },
+  sectionTitle: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  featuredRow: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  featuredCover: { width: 120, height: 160, borderRadius: radius.md, overflow: 'hidden' },
+  featuredTitle: { width: 120, marginTop: spacing.xs },
+  sample: { position: 'absolute', left: 6, bottom: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
 });

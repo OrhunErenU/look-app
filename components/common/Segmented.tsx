@@ -26,7 +26,13 @@ export function Segmented<T extends string>({
             accessibilityRole="radio"
             accessibilityState={{ selected: active }}
           >
-            <Text variant="caption" style={{ color: active ? colors.background : colors.text, fontWeight: '500' }}>
+            <Text
+              variant="caption"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={{ color: active ? colors.background : colors.text, fontWeight: '500' }}
+            >
               {o.label}
             </Text>
           </Pressable>

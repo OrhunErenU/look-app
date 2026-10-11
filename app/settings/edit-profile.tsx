@@ -54,6 +54,10 @@ export default function EditProfile() {
       setErrors({ username: usernameError });
       return;
     }
+    if (!displayName.trim()) {
+      setErrors({ form: 'Görünen ad boş bırakılamaz.' });
+      return;
+    }
     setSaving(true);
     setErrors({});
     try {
@@ -69,7 +73,7 @@ export default function EditProfile() {
 
       await updateProfile(me.id, {
         username: nextUsername,
-        display_name: displayName.trim() || null,
+        display_name: displayName.trim(),
         bio: bio.trim() || null,
         avatar_path: avatarPath,
       });
@@ -118,6 +122,7 @@ export default function EditProfile() {
         autoCapitalize="none"
         autoCorrect={false}
         maxLength={USERNAME_MAX}
+        hint="Kullanıcı adını 30 günde bir değiştirebilirsin."
       />
       <TextField label="Görünen ad" value={displayName} onChangeText={setDisplayName} maxLength={DISPLAY_NAME_MAX} />
       <TextField label="Biyografi" value={bio} onChangeText={setBio} multiline maxLength={BIO_MAX} showCount />

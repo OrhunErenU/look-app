@@ -19,7 +19,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
@@ -43,6 +44,7 @@ export default function TabsLayout() {
         options={{
           title: 'Paylaş',
           tabBarAccessibilityLabel: 'Kombin paylaş',
+          tabBarLabel: () => null,
           // Paylaş sekmesi diğerlerinden görsel olarak ayrılır.
           tabBarIcon: () => (
             <View style={[styles.create, { backgroundColor: colors.accent }]}>
@@ -52,8 +54,8 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="saved"
-        options={{ title: 'Kaydedilenler', tabBarIcon: icon('bookmark', 'bookmark-outline') }}
+        name="wardrobe"
+        options={{ title: 'Gardırop', tabBarIcon: icon('shirt', 'shirt-outline') }}
       />
       <Tabs.Screen
         name="profile"

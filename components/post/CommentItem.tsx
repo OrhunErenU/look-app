@@ -1,9 +1,11 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/common/Avatar';
 import { Text } from '@/components/common/Text';
 import { spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/useTheme';
 import type { Comment } from '@/types/database';
 import { timeAgo } from '@/utils/format';
 
@@ -12,12 +14,15 @@ export function CommentItem({
   isReply,
   onReply,
   onLongPress,
+  onMenu,
 }: {
   comment: Comment;
   isReply: boolean;
   onReply?: () => void;
   onLongPress?: () => void;
+  onMenu?: () => void;
 }) {
+  const { colors } = useTheme();
   const deleted = Boolean(comment.deleted_at);
   const username = comment.author?.username ?? 'kullanıcı';
   const edited = !deleted && comment.updated_at !== comment.created_at;
@@ -61,6 +66,11 @@ export function CommentItem({
           ) : null}
         </View>
       </View>
+      {!deleted && onMenu ? (
+        <Pressable onPress={onMenu} hitSlop={10} accessibilityRole="button" accessibilityLabel="Yorum seçenekleri">
+          <Ionicons name="ellipsis-horizontal" size={16} color={colors.textSecondary} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }

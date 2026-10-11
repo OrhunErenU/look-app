@@ -1,14 +1,17 @@
 // Görsel boyut hesapları. Saf fonksiyonlardır; test edilebilir.
 
-export type AspectOption = 'original' | '4:5' | '1:1';
+// Dikey kombin fotoğraflarında 3:4 ana orandır.
+export type AspectOption = 'original' | '3:4' | '4:5' | '1:1';
 
 export const ASPECT_LABELS: Record<AspectOption, string> = {
   original: 'Orijinal',
+  '3:4': '3:4',
   '4:5': '4:5',
   '1:1': '1:1',
 };
 
 const RATIOS: Record<Exclude<AspectOption, 'original'>, number> = {
+  '3:4': 3 / 4,
   '4:5': 4 / 5,
   '1:1': 1,
 };
@@ -48,5 +51,5 @@ export function fitWithin(
 // sınırlandırılır; fotoğraf kırpılmaz, kenarlarda boşluk kalır.
 export function displayAspect(width: number, height: number): number {
   const ratio = width / height;
-  return Math.min(Math.max(ratio, 4 / 5), 1.91);
+  return Math.min(Math.max(ratio, 3 / 4), 1.91);
 }

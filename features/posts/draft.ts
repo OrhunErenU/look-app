@@ -9,11 +9,14 @@ import type { AspectOption } from '@/utils/image';
 export type PostDraft = {
   images: DraftImage[];
   aspect: AspectOption;
+  title: string;
   caption: string;
   styleSlugs: string[];
   outfit: OutfitDetails;
   visibility: PostVisibility;
   commentsEnabled: boolean;
+  // Kombinde kullanılan gardırop parçaları.
+  itemIds: string[];
 };
 
 const KEY = 'look.post-draft';
@@ -21,11 +24,13 @@ const KEY = 'look.post-draft';
 export const emptyDraft: PostDraft = {
   images: [],
   aspect: 'original',
+  title: '',
   caption: '',
   styleSlugs: [],
   outfit: {},
   visibility: 'public',
   commentsEnabled: true,
+  itemIds: [],
 };
 
 export async function loadDraft(): Promise<PostDraft | null> {

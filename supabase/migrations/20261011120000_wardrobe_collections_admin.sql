@@ -444,6 +444,22 @@ create policy "app_settings: herkes okur" on public.app_settings
   for select to anon, authenticated using (true);
 grant select on public.app_settings to anon, authenticated;
 
+-- Cihaz belirteci kaydı: aynı cihazda hesap değiştirildiğinde belirteç yeni
+-- kullanıcıya devredilir, böylece eski hesabın bildirimleri o cihaza gitmez.
+create function public.register_device(p_token text, p_platform text)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Oturum bulunamadı.' using errcode = '42501';
+  end if;
+  insert into public.device_tokens (token, user_id, platform, last_seen_at)
+  values (p_token, auth.uid(), p_platform, now())
+  on conflict (token) do update set user_id = excluded.user_id, platform = excluded.platform, last_seen_at = now();
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Şikâyet sınırları
 -- ---------------------------------------------------------------------------

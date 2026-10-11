@@ -1,5 +1,6 @@
 // LOOK tasarım sistemi. Renkler yalnızca buradan okunur; ekranlar sabit renk
-// kodu kullanmaz.
+// kodu kullanmaz. Marka yönü: editoryal moda dergisi — siyah ana renk, kırık
+// beyaz zemin, taş/gri/soluk zeytin ikincil tonlar.
 
 export const palette = {
   light: {
@@ -8,8 +9,10 @@ export const palette = {
     text: '#171717',
     textSecondary: '#777777',
     border: '#E8E6E1',
-    accent: '#6F5BFF',
-    onAccent: '#FFFFFF',
+    accent: '#171717',
+    onAccent: '#FAF9F6',
+    stone: '#D9D3C7',
+    olive: '#7D8461',
     success: '#27845A',
     danger: '#C93C3C',
     skeleton: '#EFEDE8',
@@ -21,8 +24,10 @@ export const palette = {
     text: '#F5F4F0',
     textSecondary: '#9A9A9A',
     border: '#2A2A2A',
-    accent: '#8A7AFF',
-    onAccent: '#FFFFFF',
+    accent: '#F5F4F0',
+    onAccent: '#111111',
+    stone: '#3A3631',
+    olive: '#A3AA84',
     success: '#3FA676',
     danger: '#E05A5A',
     skeleton: '#232323',

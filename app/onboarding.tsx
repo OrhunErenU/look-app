@@ -15,7 +15,8 @@ import { UserRow } from '@/components/profile/UserRow';
 import { spacing } from '@/constants/theme';
 import { signOut } from '@/features/auth/api';
 import { useAuth } from '@/features/auth/AuthProvider';
-import { createProfile, isUsernameAvailable, suggestedProfiles, updateProfile } from '@/features/profiles/api';
+import { createProfile, isUsernameAvailable, searchProfiles, suggestedProfiles, updateProfile } from '@/features/profiles/api';
+import { shareProfile } from '@/features/posts/share';
 import { useTheme } from '@/hooks/useTheme';
 import { uploadAvatar } from '@/services/media';
 import type { FollowStatus, Profile } from '@/types/database';
@@ -33,14 +34,9 @@ import {
 type Step = 'identity' | 'about' | 'styles' | 'friends';
 const STEPS: Step[] = ['identity', 'about', 'styles', 'friends'];
 
-function isoToTurkish(iso: unknown): string {
-  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
-  const [y, m, d] = iso.split('-');
-  return `${d}.${m}.${y}`;
-}
-
 // Kayıttan sonra kısa profil oluşturma akışı. Profil kaydı stil seçiminden
-// sonra oluşturulur; son adımda arkadaş önerileri gösterilir.
+// sonra oluşturulur; son adımda arkadaş bulma ve davet seçenekleri gösterilir.
+// Doğum tarihi yalnızca sunucuda yaş kontrolü için kullanılır, saklanmaz.
 export default function Onboarding() {
   const { session, refreshProfile } = useAuth();
   const { colors } = useTheme();
@@ -48,8 +44,9 @@ export default function Onboarding() {
 
   const [step, setStep] = useState<Step>('identity');
   const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [birthDate, setBirthDate] = useState(isoToTurkish(session?.user.user_metadata?.birth_date));
+  const metadataName = session?.user.user_metadata?.full_name ?? session?.user.user_metadata?.name;
+  const [displayName, setDisplayName] = useState(typeof metadataName === 'string' ? metadataName.slice(0, 50) : '');
+  const [birthDate, setBirthDate] = useState('');
   const [bio, setBio] = useState('');
   const [avatar, setAvatar] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [styleSlugs, setStyleSlugs] = useState<string[]>([]);
@@ -58,14 +55,35 @@ export default function Onboarding() {
 
   const [suggestions, setSuggestions] = useState<Profile[]>([]);
   const [follows, setFollows] = useState<Record<string, FollowStatus | null>>({});
+  const [friendQuery, setFriendQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+
+  useEffect(() => {
+    const q = friendQuery.trim();
+    if (step !== 'friends' || !q) {
+      setSearchResults([]);
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(() => {
+      searchProfiles(q)
+        .then((r) => active && setSearchResults(r.filter((p) => p.id !== userId)))
+        .catch(() => active && setSearchResults([]));
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [friendQuery, step, userId]);
 
   const nextFromIdentity = async () => {
     const next = {
       username: validateUsername(username) ?? undefined,
+      displayName: displayName.trim() ? undefined : 'Görünen adını gir.',
       birthDate: validateBirthDate(birthDate) ?? undefined,
     };
     setErrors(next);
-    if (next.username || next.birthDate) return;
+    if (next.username || next.displayName || next.birthDate) return;
     setBusy(true);
     try {
       if (!(await isUsernameAvailable(username))) {
@@ -122,7 +140,7 @@ export default function Onboarding() {
 
   const finish = async () => {
     await refreshProfile();
-    router.replace('/explore');
+    router.replace('/');
   };
 
   useEffect(() => {
@@ -156,9 +174,10 @@ export default function Onboarding() {
             maxLength={USERNAME_MAX}
           />
           <TextField
-            label="Görünen ad (isteğe bağlı)"
+            label="Görünen ad"
             value={displayName}
             onChangeText={setDisplayName}
+            error={errors.displayName}
             maxLength={DISPLAY_NAME_MAX}
           />
           <TextField
@@ -166,7 +185,7 @@ export default function Onboarding() {
             value={birthDate}
             onChangeText={setBirthDate}
             error={errors.birthDate}
-            hint="GG.AA.YYYY · Profilinde gösterilmez."
+            hint="GG.AA.YYYY · Yalnızca yaşını doğrulamak için kullanılır, saklanmaz."
             placeholder="01.01.2000"
             keyboardType="numbers-and-punctuation"
             maxLength={10}
@@ -208,7 +227,7 @@ export default function Onboarding() {
       {step === 'styles' ? (
         <>
           <Text variant="display">Hangi tarzlar ilgini çekiyor?</Text>
-          <Text tone="secondary">Birden fazla seçebilirsin. Seçim zorunlu değil.</Text>
+          <Text tone="secondary">3 veya daha fazla stil seçmen keşfeti sana göre düzenler. Bu adımı atlayabilirsin.</Text>
           <StylePicker selected={styleSlugs} onChange={setStyleSlugs} />
           {errors.form ? <Text tone="danger">{errors.form}</Text> : null}
           <Button title={styleSlugs.length ? 'Devam' : 'Şimdilik atla'} onPress={finishProfile} loading={busy} />
@@ -218,13 +237,31 @@ export default function Onboarding() {
 
       {step === 'friends' ? (
         <>
-          <Text variant="display">İnsanları bul</Text>
-          <Text tone="secondary">Tarzına yakın kişileri takip ederek ana sayfanı doldur.</Text>
+          <Text variant="display">Arkadaşlarını bul</Text>
+          <Text tone="secondary">
+            Kullanıcı adıyla ara, arkadaşlarını davet et veya tarzına yakın kişileri takip et. Rehber erişimi istemiyoruz.
+          </Text>
+          <TextField
+            placeholder="@kullanıcıadı ara"
+            value={friendQuery}
+            onChangeText={setFriendQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Kullanıcı ara"
+          />
+          <Button
+            title="Davet bağlantısı paylaş"
+            icon="share-outline"
+            variant="secondary"
+            onPress={() => shareProfile(normalizeUsername(username), true)}
+          />
           <View style={styles.list}>
-            {suggestions.length === 0 ? (
-              <Text tone="secondary">Şu an öneri yok. Keşfet'te yeni insanlar bulabilirsin.</Text>
+            {(friendQuery.trim() ? searchResults : suggestions).length === 0 ? (
+              <Text tone="secondary" style={styles.listNote}>
+                {friendQuery.trim() ? 'Bu kullanıcı adıyla kimse bulunamadı.' : 'Şu an öneri yok; ana sayfadan kombinleri keşfedebilirsin.'}
+              </Text>
             ) : (
-              suggestions.map((user) => (
+              (friendQuery.trim() ? searchResults : suggestions).map((user) => (
                 <UserRow
                   key={user.id}
                   user={user}
@@ -241,7 +278,7 @@ export default function Onboarding() {
               ))
             )}
           </View>
-          <Button title="Keşfet'e geç" onPress={finish} />
+          <Button title="Devam et" onPress={finish} />
         </>
       ) : null}
     </Screen>
@@ -262,4 +299,5 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   list: { marginHorizontal: -spacing.xl },
+  listNote: { paddingHorizontal: spacing.xl },
 });

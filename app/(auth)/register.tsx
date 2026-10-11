@@ -12,20 +12,14 @@ import { spacing } from '@/constants/theme';
 import { signUpWithEmail } from '@/features/auth/api';
 import { useTheme } from '@/hooks/useTheme';
 import { friendlyError } from '@/utils/errors';
-import {
-  parseTurkishDate,
-  validateBirthDate,
-  validateEmail,
-  validatePassword,
-} from '@/utils/validation';
+import { validateEmail, validatePassword } from '@/utils/validation';
 
-type Errors = Partial<Record<'email' | 'password' | 'birthDate' | 'terms' | 'form', string>>;
+type Errors = Partial<Record<'email' | 'password' | 'terms' | 'form', string>>;
 
 export default function Register() {
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [birthDate, setBirthDate] = useState('');
   const [accepted, setAccepted] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
@@ -35,7 +29,6 @@ export default function Register() {
     const next: Errors = {
       email: validateEmail(email) ?? undefined,
       password: validatePassword(password) ?? undefined,
-      birthDate: validateBirthDate(birthDate) ?? undefined,
       terms: accepted ? undefined : 'Devam etmek için şartları kabul etmelisin.',
     };
     setErrors(next);
@@ -43,7 +36,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const { needsEmailConfirmation } = await signUpWithEmail(email, password, parseTurkishDate(birthDate)!);
+      const { needsEmailConfirmation } = await signUpWithEmail(email, password);
       // Doğrulama kapalıysa oturum açılır ve yönlendirme otomatik olarak
       // profil oluşturma adımına geçer.
       if (needsEmailConfirmation) setSentTo(email.trim());
@@ -90,16 +83,6 @@ export default function Register() {
         secureTextEntry
         autoComplete="new-password"
         textContentType="newPassword"
-      />
-      <TextField
-        label="Doğum tarihi"
-        value={birthDate}
-        onChangeText={setBirthDate}
-        error={errors.birthDate}
-        hint="GG.AA.YYYY · Yaş kontrolü için gerekli, profilinde gösterilmez."
-        placeholder="01.01.2000"
-        keyboardType="numbers-and-punctuation"
-        maxLength={10}
       />
 
       <Pressable

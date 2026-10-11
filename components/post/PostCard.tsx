@@ -16,11 +16,12 @@ type Props = {
   onLike: (post: FeedPost) => void;
   onSave: (post: FeedPost) => void;
   onMenu: (post: FeedPost) => void;
+  onShare?: (post: FeedPost) => void;
   // Ayrıntı ekranında açıklama kısaltılmaz ve yorum bağlantısı gösterilmez.
   detailed?: boolean;
 };
 
-export const PostCard = memo(function PostCard({ post, onLike, onSave, onMenu, detailed = false }: Props) {
+export const PostCard = memo(function PostCard({ post, onLike, onSave, onMenu, onShare, detailed = false }: Props) {
   const { colors } = useTheme();
   const heartScale = useRef(new Animated.Value(1)).current;
 
@@ -51,6 +52,7 @@ export const PostCard = memo(function PostCard({ post, onLike, onSave, onMenu, d
               {post.author.username}
             </Text>
             <Text variant="small" tone="secondary">
+              {post.pinned_at && detailed ? 'Öne çıkarıldı · ' : ''}
               {timeAgo(post.created_at)}
               {post.visibility !== 'public'
                 ? post.visibility === 'followers'
@@ -103,6 +105,16 @@ export const PostCard = memo(function PostCard({ post, onLike, onSave, onMenu, d
         <Text variant="caption" style={styles.count}>
           {compactCount(post.comment_count)}
         </Text>
+        {onShare && post.visibility === 'public' ? (
+          <Pressable
+            onPress={() => onShare(post)}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel="Paylaş"
+          >
+            <Ionicons name="paper-plane-outline" size={22} color={colors.text} />
+          </Pressable>
+        ) : null}
         <View style={styles.flex} />
         <Pressable
           onPress={() => onSave(post)}
@@ -120,6 +132,12 @@ export const PostCard = memo(function PostCard({ post, onLike, onSave, onMenu, d
       </View>
 
       <View style={styles.body}>
+        {post.is_sample ? (
+          <View style={[styles.sample, { backgroundColor: colors.stone }]}>
+            <Text variant="small">LOOK örnek kombin</Text>
+          </View>
+        ) : null}
+        {post.title ? <Text variant="subtitle">{post.title}</Text> : null}
         {post.caption ? (
           <Text variant="body" numberOfLines={detailed ? undefined : 3}>
             <Text variant="username">{post.author.username} </Text>
@@ -164,4 +182,5 @@ const styles = StyleSheet.create({
   count: { marginLeft: -6, marginRight: spacing.sm, minWidth: 16 },
   body: { paddingHorizontal: spacing.lg, gap: spacing.xs },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  sample: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 4 },
 });

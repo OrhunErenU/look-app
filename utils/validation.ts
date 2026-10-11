@@ -5,6 +5,7 @@ export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 30;
 export const BIO_MAX = 160;
 export const DISPLAY_NAME_MAX = 50;
+export const TITLE_MAX = 80;
 export const CAPTION_MAX = 2200;
 export const COMMENT_MAX = 500;
 export const MIN_AGE = 18;
